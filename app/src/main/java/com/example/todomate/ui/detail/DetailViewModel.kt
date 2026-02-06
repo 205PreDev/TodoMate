@@ -5,18 +5,28 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.example.todomate.data.local.LifeAreaEntity
 import com.example.todomate.data.local.TodoDatabase
 import com.example.todomate.data.local.TodoEntity
+import com.example.todomate.data.repository.DashboardRepository
 import com.example.todomate.data.repository.TodoRepository
 import kotlinx.coroutines.launch
 
 class DetailViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: TodoRepository
+    private val dashboardRepository: DashboardRepository
+
+    val lifeAreas: LiveData<List<LifeAreaEntity>>
 
     init {
-        val dao = TodoDatabase.getInstance(application).todoDao()
-        repository = TodoRepository(dao)
+        val database = TodoDatabase.getInstance(application)
+        repository = TodoRepository(database.todoDao())
+        dashboardRepository = DashboardRepository(
+            database.lifeAreaDao(),
+            database.weeklyGoalDao()
+        )
+        lifeAreas = dashboardRepository.getAllLifeAreas()
     }
 
     fun getTodoById(id: Long): LiveData<TodoEntity?> {
@@ -33,7 +43,7 @@ class DetailViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun update(id: Long, title: String, description: String, priority: Int, category: String) {
+    fun update(id: Long, title: String, description: String, priority: Int, category: String, lifeAreaId: Long?) {
         viewModelScope.launch {
             val existing = repository.getTodoById(id)
             existing?.let {
@@ -42,7 +52,8 @@ class DetailViewModel(application: Application) : AndroidViewModel(application) 
                         title = title,
                         description = description,
                         priority = priority,
-                        category = category
+                        category = category,
+                        lifeAreaId = lifeAreaId
                     )
                 )
             }

@@ -15,4 +15,10 @@
         android:title="@string/sort"
         app:showAsAction="ifRoom" />
 
+    <item
+        android:id="@+id/action_dashboard"
+        android:icon="@android:drawable/ic_menu_compass"
+        android:title="@string/dashboard"
+        app:showAsAction="ifRoom" />
+
 </menu>

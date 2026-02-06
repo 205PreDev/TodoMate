@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Life Direction Radar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            overflow: hidden;
+            background: transparent;
+            touch-action: none;
+        }
+        canvas { display: block; }
+        #legend {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            font-family: sans-serif;
+            font-size: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #4CAF50;"></div>
+            <span id="goalLabel">목표</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #2196F3;"></div>
+            <span id="actualLabel">실제</span>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, controls;
+        let goalMeshes = [], actualMeshes = [], labelSprites = [];
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let rotationSpeed = 0.005;
+        let targetRotationX = 0, targetRotationY = 0;
+        let currentRotationX = 0, currentRotationY = 0;
+        let chartGroup;
+
+        // 색상 설정
+        const goalColor = 0x4CAF50;
+        const actualColor = 0x2196F3;
+        const axisColor = 0x888888;
+        const gridColor = 0xcccccc;
+
+        function init() {
+            const container = document.getElementById('container');
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = null; // 투명 배경
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+            camera.position.set(0, 2, 4);
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // Chart group for rotation
+            chartGroup = new THREE.Group();
+            scene.add(chartGroup);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            scene.add(directionalLight);
+
+            // Touch/Mouse controls
+            setupControls();
+
+            // Initial render
+            animate();
+        }
+
+        function setupControls() {
+            const canvas = renderer.domElement;
+            let touches = [];
+            let lastTouchDistance = 0;
+            let lastPanPosition = { x: 0, y: 0 };
+
+            // Mouse events
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const deltaX = e.clientX - previousMousePosition.x;
+                const deltaY = e.clientY - previousMousePosition.y;
+                targetRotationY += deltaX * rotationSpeed;
+                targetRotationX += deltaY * rotationSpeed;
+                targetRotationX = Math.max(-Math.PI/3, Math.min(Math.PI/3, targetRotationX));
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            canvas.addEventListener('mouseup', () => { isDragging = false; });
+            canvas.addEventListener('mouseleave', () => { isDragging = false; });
+
+            // Touch events
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touches = Array.from(e.touches);
+                if (touches.length === 1) {
+                    isDragging = true;
+                    previousMousePosition = { x: touches[0].clientX, y: touches[0].clientY };
+                } else if (touches.length === 2) {
+                    lastTouchDistance = getTouchDistance(touches);
+                    lastPanPosition = getTouchCenter(touches);
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                touches = Array.from(e.touches);
+
+                if (touches.length === 1 && isDragging) {
+                    // 한 손가락: 회전
+                    const deltaX = touches[0].clientX - previousMousePosition.x;
+                    const deltaY = touches[0].clientY - previousMousePosition.y;
+                    targetRotationY += deltaX * rotationSpeed;
+                    targetRotationX += deltaY * rotationSpeed;
+                    targetRotationX = Math.max(-Math.PI/3, Math.min(Math.PI/3, targetRotationX));
+                    previousMousePosition = { x: touches[0].clientX, y: touches[0].clientY };
+                } else if (touches.length === 2) {
+                    // 두 손가락: 줌 & 이동
+                    const currentDistance = getTouchDistance(touches);
+                    const currentCenter = getTouchCenter(touches);
+
+                    // 줌
+                    const zoomDelta = (currentDistance - lastTouchDistance) * 0.01;
+                    camera.position.z = Math.max(2, Math.min(8, camera.position.z - zoomDelta));
+
+                    // 이동
+                    const panDeltaX = (currentCenter.x - lastPanPosition.x) * 0.01;
+                    const panDeltaY = (currentCenter.y - lastPanPosition.y) * 0.01;
+                    camera.position.x -= panDeltaX;
+                    camera.position.y += panDeltaY;
+
+                    lastTouchDistance = currentDistance;
+                    lastPanPosition = currentCenter;
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', (e) => {
+                isDragging = false;
+                touches = Array.from(e.touches);
+            });
+
+            // Wheel zoom
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                camera.position.z = Math.max(2, Math.min(8, camera.position.z + e.deltaY * 0.005));
+            }, { passive: false });
+        }
+
+        function getTouchDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function getTouchCenter(touches) {
+            return {
+                x: (touches[0].clientX + touches[1].clientX) / 2,
+                y: (touches[0].clientY + touches[1].clientY) / 2
+            };
+        }
+
+        function createRadarChart(labels, goalValues, actualValues) {
+            // 기존 메시 제거
+            while(chartGroup.children.length > 0) {
+                chartGroup.remove(chartGroup.children[0]);
+            }
+            goalMeshes = [];
+            actualMeshes = [];
+            labelSprites = [];
+
+            const numAxes = labels.length;
+            if (numAxes === 0) return;
+
+            const maxValue = 100;
+            const axisLength = 2;
+
+            // 각 축의 각도 계산 (3D 공간에 균등 분포)
+            const axes = [];
+            for (let i = 0; i < numAxes; i++) {
+                const phi = Math.acos(-1 + (2 * i + 1) / numAxes);
+                const theta = Math.sqrt(numAxes * Math.PI) * phi;
+                axes.push(new THREE.Vector3(
+                    Math.cos(theta) * Math.sin(phi),
+                    Math.cos(phi),
+                    Math.sin(theta) * Math.sin(phi)
+                ).normalize());
+            }
+
+            // 중심점
+            const centerGeometry = new THREE.SphereGeometry(0.08, 16, 16);
+            const centerMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+            const centerSphere = new THREE.Mesh(centerGeometry, centerMaterial);
+            chartGroup.add(centerSphere);
+
+            // 각 축 생성
+            for (let i = 0; i < numAxes; i++) {
+                const axis = axes[i];
+
+                // 축 라인
+                const axisGeometry = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(0, 0, 0),
+                    axis.clone().multiplyScalar(axisLength)
+                ]);
+                const axisMaterial = new THREE.LineBasicMaterial({ color: axisColor, linewidth: 2 });
+                const axisLine = new THREE.Line(axisGeometry, axisMaterial);
+                chartGroup.add(axisLine);
+
+                // 그리드 원 (25%, 50%, 75%, 100%)
+                for (let j = 1; j <= 4; j++) {
+                    const gridRadius = (j / 4) * axisLength;
+                    const gridGeometry = new THREE.SphereGeometry(0.02, 8, 8);
+                    const gridMaterial = new THREE.MeshBasicMaterial({ color: gridColor });
+                    const gridPoint = new THREE.Mesh(gridGeometry, gridMaterial);
+                    gridPoint.position.copy(axis.clone().multiplyScalar(gridRadius));
+                    chartGroup.add(gridPoint);
+                }
+
+                // 목표값 표시 (녹색 구)
+                const goalValue = goalValues[i] || 0;
+                const goalDistance = (goalValue / maxValue) * axisLength;
+                const goalGeometry = new THREE.SphereGeometry(0.12, 16, 16);
+                const goalMaterial = new THREE.MeshPhongMaterial({
+                    color: goalColor,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const goalSphere = new THREE.Mesh(goalGeometry, goalMaterial);
+                goalSphere.position.copy(axis.clone().multiplyScalar(goalDistance));
+                chartGroup.add(goalSphere);
+                goalMeshes.push(goalSphere);
+
+                // 실제값 표시 (파란 구)
+                const actualValue = actualValues[i] || 0;
+                const actualDistance = (actualValue / maxValue) * axisLength;
+                const actualGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+                const actualMaterial = new THREE.MeshPhongMaterial({
+                    color: actualColor,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                const actualSphere = new THREE.Mesh(actualGeometry, actualMaterial);
+                actualSphere.position.copy(axis.clone().multiplyScalar(actualDistance));
+                chartGroup.add(actualSphere);
+                actualMeshes.push(actualSphere);
+
+                // 라벨
+                const labelSprite = createTextSprite(labels[i]);
+                labelSprite.position.copy(axis.clone().multiplyScalar(axisLength + 0.3));
+                chartGroup.add(labelSprite);
+                labelSprites.push(labelSprite);
+            }
+        }
+
+        function createTextSprite(text) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 64;
+
+            context.fillStyle = 'rgba(0, 0, 0, 0)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            context.font = 'Bold 32px Arial';
+            context.fillStyle = '#333333';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(1, 0.25, 1);
+
+            return sprite;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 부드러운 회전 적용
+            currentRotationX += (targetRotationX - currentRotationX) * 0.1;
+            currentRotationY += (targetRotationY - currentRotationY) * 0.1;
+
+            chartGroup.rotation.x = currentRotationX;
+            chartGroup.rotation.y = currentRotationY;
+
+            // 라벨이 항상 카메라를 향하도록
+            labelSprites.forEach(sprite => {
+                sprite.quaternion.copy(camera.quaternion);
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        function handleResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        window.addEventListener('resize', handleResize);
+
+        // Android에서 호출할 함수
+        function updateChart(jsonData) {
+            try {
+                const data = JSON.parse(jsonData);
+                createRadarChart(data.labels, data.goalValues, data.actualValues);
+            } catch (e) {
+                console.error('Error parsing chart data:', e);
+            }
+        }
+
+        function setTheme(isDark) {
+            if (isDark) {
+                document.body.style.color = '#ffffff';
+                document.querySelectorAll('.legend-item span').forEach(el => {
+                    el.style.color = '#ffffff';
+                });
+            } else {
+                document.body.style.color = '#333333';
+                document.querySelectorAll('.legend-item span').forEach(el => {
+                    el.style.color = '#333333';
+                });
+            }
+        }
+
+        // 초기화
+        init();
+
+        // 기본 데이터로 테스트
+        createRadarChart(
+            ['커리어', '건강', '학습', '관계', '재정'],
+            [60, 40, 80, 50, 30],
+            [45, 55, 70, 40, 25]
+        );
+    </script>
+</body>
+</html>

@@ -1,12 +1,14 @@
 package com.example.todomate.ui.detail
 
 import android.os.Bundle
+import android.widget.ArrayAdapter
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.todomate.R
+import com.example.todomate.data.local.LifeAreaEntity
 import com.example.todomate.data.local.TodoEntity
 import com.example.todomate.databinding.ActivityDetailBinding
 
@@ -15,6 +17,8 @@ class DetailActivity : AppCompatActivity() {
     private lateinit var binding: ActivityDetailBinding
     private val viewModel: DetailViewModel by viewModels()
     private var todoId: Long = -1L
+    private var lifeAreas: List<LifeAreaEntity> = emptyList()
+    private var selectedLifeAreaId: Long? = null
 
     companion object {
         const val EXTRA_TODO_ID = "extra_todo_id"
@@ -35,6 +39,7 @@ class DetailActivity : AppCompatActivity() {
         todoId = intent.getLongExtra(EXTRA_TODO_ID, -1L)
 
         setupToolbar()
+        setupLifeAreaDropdown()
         setupSaveButton()
 
         if (todoId != -1L) {
@@ -48,6 +53,19 @@ class DetailActivity : AppCompatActivity() {
         supportActionBar?.title =
             if (todoId == -1L) getString(R.string.add_todo)
             else getString(R.string.edit_todo)
+    }
+
+    private fun setupLifeAreaDropdown() {
+        viewModel.lifeAreas.observe(this) { areas ->
+            lifeAreas = areas
+            val items = listOf(getString(R.string.none)) + areas.map { it.name }
+            val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, items)
+            binding.dropdownLifeArea.setAdapter(adapter)
+
+            binding.dropdownLifeArea.setOnItemClickListener { _, _, position, _ ->
+                selectedLifeAreaId = if (position == 0) null else areas[position - 1].id
+            }
+        }
     }
 
     private fun setupSaveButton() {
@@ -73,6 +91,15 @@ class DetailActivity : AppCompatActivity() {
                     "개인" -> binding.chipCategoryPersonal.isChecked = true
                     "쇼핑" -> binding.chipCategoryShopping.isChecked = true
                     else -> binding.chipCategoryEtc.isChecked = true
+                }
+
+                // 생활 영역 선택 복원
+                selectedLifeAreaId = it.lifeAreaId
+                it.lifeAreaId?.let { areaId ->
+                    val area = lifeAreas.find { area -> area.id == areaId }
+                    area?.let { found ->
+                        binding.dropdownLifeArea.setText(found.name, false)
+                    }
                 }
             }
         }
@@ -106,11 +133,12 @@ class DetailActivity : AppCompatActivity() {
                     title = title,
                     description = description,
                     priority = priority,
-                    category = category
+                    category = category,
+                    lifeAreaId = selectedLifeAreaId
                 )
             )
         } else {
-            viewModel.update(todoId, title, description, priority, category)
+            viewModel.update(todoId, title, description, priority, category, selectedLifeAreaId)
         }
 
         finish()

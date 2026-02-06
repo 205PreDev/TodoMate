@@ -33,4 +33,26 @@ interface TodoDao {
 
     @Delete
     suspend fun delete(todo: TodoEntity)
+
+    // 생활 영역별 통계
+    @Query("""
+        SELECT lifeAreaId, COUNT(*) as count
+        FROM todos
+        WHERE createdAt >= :startDate AND createdAt < :endDate AND lifeAreaId IS NOT NULL
+        GROUP BY lifeAreaId
+    """)
+    fun getTodoCountByLifeArea(startDate: Long, endDate: Long): LiveData<List<LifeAreaCount>>
+
+    @Query("""
+        SELECT lifeAreaId, COUNT(*) as count
+        FROM todos
+        WHERE createdAt >= :startDate AND createdAt < :endDate AND isCompleted = 1 AND lifeAreaId IS NOT NULL
+        GROUP BY lifeAreaId
+    """)
+    fun getCompletedCountByLifeArea(startDate: Long, endDate: Long): LiveData<List<LifeAreaCount>>
 }
+
+data class LifeAreaCount(
+    val lifeAreaId: Long,
+    val count: Int
+)

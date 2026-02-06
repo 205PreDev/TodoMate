@@ -6,25 +6,22 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(
-    tableName = "todos",
+    tableName = "weekly_goals",
     foreignKeys = [
         ForeignKey(
             entity = LifeAreaEntity::class,
             parentColumns = ["id"],
             childColumns = ["lifeAreaId"],
-            onDelete = ForeignKey.SET_NULL
+            onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("lifeAreaId")]
+    indices = [Index("lifeAreaId"), Index("weekStartDate")]
 )
-data class TodoEntity(
+data class WeeklyGoalEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val title: String,
-    val description: String = "",
-    val isCompleted: Boolean = false,
-    val priority: Int = 1, // 0=LOW, 1=MEDIUM, 2=HIGH
-    val category: String = "개인",
-    val lifeAreaId: Long? = null, // 생활 영역 연결
+    val lifeAreaId: Long,
+    val weekStartDate: Long, // 주의 시작일 (월요일) timestamp
+    val targetPercentage: Int, // 목표 비율 (0-100)
     val createdAt: Long = System.currentTimeMillis()
 )

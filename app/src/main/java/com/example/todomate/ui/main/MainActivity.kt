@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.todomate.R
 import com.example.todomate.data.local.TodoEntity
 import com.example.todomate.databinding.ActivityMainBinding
+import com.example.todomate.ui.dashboard.DashboardActivity
 import com.example.todomate.ui.detail.DetailActivity
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
@@ -38,6 +39,7 @@ class MainActivity : AppCompatActivity() {
 
         setupToolbar()
         setupRecyclerView()
+        setupEncouragement()
         observeData()
         setupFab()
     }
@@ -63,12 +65,40 @@ class MainActivity : AppCompatActivity() {
             todoAdapter.submitList(todos)
             binding.textEmpty.isVisible = todos.isEmpty()
             binding.recyclerView.isVisible = todos.isNotEmpty()
+
+            // 할 일 목록이 로드되면 격려 메시지 요청 (최초 1회)
+            if (viewModel.encouragementMessage.value == null) {
+                viewModel.requestEncouragement()
+            }
+        }
+
+        viewModel.encouragementMessage.observe(this) { state ->
+            when (state) {
+                is MainViewModel.AiMessageState.Loading -> {
+                    binding.textEncouragement.text = getString(R.string.loading_message)
+                    binding.btnRefreshMessage.isEnabled = false
+                }
+                is MainViewModel.AiMessageState.Success -> {
+                    binding.textEncouragement.text = state.message
+                    binding.btnRefreshMessage.isEnabled = true
+                }
+                is MainViewModel.AiMessageState.Error -> {
+                    binding.textEncouragement.text = state.message
+                    binding.btnRefreshMessage.isEnabled = true
+                }
+            }
         }
     }
 
     private fun setupFab() {
         binding.fabAdd.setOnClickListener {
             navigateToDetail(-1L)
+        }
+    }
+
+    private fun setupEncouragement() {
+        binding.btnRefreshMessage.setOnClickListener {
+            viewModel.requestEncouragement()
         }
     }
 
@@ -112,6 +142,10 @@ class MainActivity : AppCompatActivity() {
         return when (item.itemId) {
             R.id.action_sort -> {
                 showSortDialog()
+                true
+            }
+            R.id.action_dashboard -> {
+                startActivity(Intent(this, DashboardActivity::class.java))
                 true
             }
             else -> super.onOptionsItemSelected(item)

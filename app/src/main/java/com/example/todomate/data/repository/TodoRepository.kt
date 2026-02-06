@@ -21,4 +21,10 @@ class TodoRepository(private val todoDao: TodoDao) {
     suspend fun update(todo: TodoEntity) = todoDao.update(todo)
 
     suspend fun delete(todo: TodoEntity) = todoDao.delete(todo)
+
+    fun getTodoCountByLifeArea(startDate: Long, endDate: Long) =
+        todoDao.getTodoCountByLifeArea(startDate, endDate)
+
+    fun getCompletedCountByLifeArea(startDate: Long, endDate: Long) =
+        todoDao.getCompletedCountByLifeArea(startDate, endDate)
 }
