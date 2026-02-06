@@ -1,0 +1,40 @@
+<resources>
+    <string name="app_name">TodoMate</string>
+
+    <!-- Detail Screen -->
+    <string name="add_todo">할 일 추가</string>
+    <string name="edit_todo">할 일 수정</string>
+    <string name="title_hint">제목</string>
+    <string name="description_hint">설명 (선택)</string>
+    <string name="save">저장</string>
+
+    <!-- Priority -->
+    <string name="priority">우선순위</string>
+    <string name="priority_high">높음</string>
+    <string name="priority_medium">중간</string>
+    <string name="priority_low">낮음</string>
+
+    <!-- Category -->
+    <string name="category">카테고리</string>
+    <string name="category_work">업무</string>
+    <string name="category_personal">개인</string>
+    <string name="category_shopping">쇼핑</string>
+    <string name="category_etc">기타</string>
+
+    <!-- Actions -->
+    <string name="delete">삭제</string>
+    <string name="cancel">취소</string>
+    <string name="search">검색</string>
+    <string name="sort">정렬</string>
+
+    <!-- Sort Options -->
+    <string name="sort_date_desc">최신순</string>
+    <string name="sort_date_asc">오래된순</string>
+    <string name="sort_priority">우선순위순</string>
+
+    <!-- Messages -->
+    <string name="empty_todos">할 일이 없습니다.\n+ 버튼을 눌러 추가해보세요!</string>
+    <string name="delete_title">할 일 삭제</string>
+    <string name="delete_message">이 할 일을 삭제하시겠습니까?</string>
+    <string name="error_empty_title">제목을 입력해주세요</string>
+</resources>
